@@ -7,7 +7,8 @@
 		"dev:client": "pnpm --filter client dev",
 		"dev:server": "pnpm --filter server dev",
 		"dev": "concurrently \"pnpm run dev:client\" \"pnpm run dev:server\"",
-		"install:all": "pnpm install && cd client && pnpm install && cd ../server && pnpm install"
+		"install:all": "pnpm install && cd client && pnpm install && cd ../server && pnpm install",
+		"seed": "cd server && npm run seed"
 	},
 	"keywords": [],
 	"author": "",
