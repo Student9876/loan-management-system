@@ -3,6 +3,10 @@ import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
+
+import loanRoutes from './routes/loan.routes';
+import authRoutes from './routes/auth.routes';
+
 dotenv.config();
 
 const app = express();
@@ -11,8 +15,8 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 
-import authRoutes from './routes/auth.routes';
 app.use('/api/auth', authRoutes);
+app.use('/api/loans', loanRoutes);
 
 app.get('/health', (req, res) => {
     res.status(200).json({ status: 'OK' });
