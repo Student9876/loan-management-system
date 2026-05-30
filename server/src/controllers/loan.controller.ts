@@ -112,14 +112,20 @@ export const updateLoanStatus = async (req: Request, res: Response): Promise<voi
 
         // Strict State Machine Enforcement based on Role
         let isValidTransition = false;
-        if (role === 'Sanction' || role === 'Admin') {
-            if (loan.status === 'Applied' && (status === 'Sanctioned' || status === 'Rejected')) {
-                isValidTransition = true;
-            }
-        } else if (role === 'Disbursement' || role === 'Admin') {
-            if (loan.status === 'Sanctioned' && status === 'Disbursed') {
-                isValidTransition = true;
-            }
+
+        if (loan.status === 'Applied' && (status === 'Sanctioned' || status === 'Rejected')) {
+            if (role === 'Sanction' || role === 'Admin') isValidTransition = true;
+        }
+        else if (loan.status === 'Sanctioned' && status === 'Disbursed') {
+            if (role === 'Disbursement' || role === 'Admin') isValidTransition = true;
+        }
+        else if (loan.status === 'Disbursed' && status === 'Closed') {
+            if (role === 'Collection' || role === 'Admin') isValidTransition = true;
+        }
+
+        if (!isValidTransition) {
+            res.status(400).json({ message: `Invalid status transition to ${status} for role ${role}` });
+            return;
         }
 
         if (!isValidTransition) {
