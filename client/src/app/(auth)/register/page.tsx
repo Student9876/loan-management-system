@@ -25,8 +25,10 @@ export default function RegisterPage() {
 		setFormData({...formData, [e.target.name]: e.target.value});
 	};
 
-	const handleRoleChange = (value: string) => {
-		setFormData({...formData, role: value});
+	const handleRoleChange = (value: string | null) => {
+		if (value) {
+			setFormData({...formData, role: value});
+		}
 	};
 
 	const handleRegister = async (e: React.FormEvent) => {
@@ -37,8 +39,9 @@ export default function RegisterPage() {
 		try {
 			await api.post("/auth/register", formData);
 			router.push("/login");
-		} catch (err: any) {
-			setError(err.response?.data?.message || "Failed to register.");
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string}}};
+			setError(error.response?.data?.message || "Failed to register.");
 		} finally {
 			setLoading(false);
 		}

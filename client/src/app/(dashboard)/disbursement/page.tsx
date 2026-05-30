@@ -8,7 +8,7 @@ import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/c
 import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {toast} from "sonner";
-import {Banknote, CheckCircle2} from "lucide-react";
+import {Banknote} from "lucide-react";
 
 interface Application {
 	_id: string;
@@ -40,7 +40,8 @@ export default function DisbursementDashboard() {
 				// Force filter on the frontend to ensure we only see actionable items for this stage
 				const actionableLoans = (response.data.data || []).filter((app: Application) => app.status === "Sanctioned");
 				setApplications(actionableLoans);
-			} catch (error: any) {
+			} catch (err) {
+				const error = err as {response?: {data?: {message?: string}}};
 				toast.error(error.response?.data?.message || "Failed to fetch applications");
 			} finally {
 				setLoading(false);
@@ -55,7 +56,8 @@ export default function DisbursementDashboard() {
 			await api.patch(`/loans/${id}/status`, {status: "Disbursed"});
 			toast.success("Funds disbursed successfully. Loan is now active.");
 			setApplications((prev) => prev.filter((app) => app._id !== id));
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string}}};
 			toast.error(error.response?.data?.message || "Failed to disburse funds");
 		}
 	};

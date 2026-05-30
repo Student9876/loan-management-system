@@ -33,7 +33,8 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 			toast.success("Loan application submitted successfully!");
 			resetApplication();
 			router.push("/login"); // Or a dedicated success page
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string; errors?: string[]}}};
 			const msg = error.response?.data?.message || "Submission failed";
 			const errors = error.response?.data?.errors;
 			if (errors && errors.length > 0) {
@@ -62,7 +63,9 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 						max={500000}
 						step={10000}
 						value={[loanConfig.amount]}
-						onValueChange={(val: any) => setLoanConfig({amount: Array.isArray(val) ? val[0] : val})}
+						onValueChange={(val: number | readonly number[]) =>
+							setLoanConfig({amount: Array.isArray(val) ? val[0] : val})
+						}
 					/>
 				</div>
 
@@ -76,7 +79,9 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 						max={365}
 						step={1}
 						value={[loanConfig.tenure]}
-						onValueChange={(val: any) => setLoanConfig({tenure: Array.isArray(val) ? val[0] : val})}
+						onValueChange={(val: number | readonly number[]) =>
+							setLoanConfig({tenure: Array.isArray(val) ? val[0] : val})
+						}
 					/>
 				</div>
 

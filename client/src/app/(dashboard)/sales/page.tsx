@@ -26,7 +26,8 @@ export default function SalesDashboard() {
 				if (response.data.type === "leads") {
 					setLeads(response.data.data);
 				}
-			} catch (error: any) {
+			} catch (err) {
+				const error = err as {response?: {data?: {message?: string}}};
 				toast.error(error.response?.data?.message || "Failed to fetch leads");
 			} finally {
 				setLoading(false);

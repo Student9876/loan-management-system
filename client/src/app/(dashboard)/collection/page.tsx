@@ -41,7 +41,8 @@ export default function CollectionDashboard() {
 				// Filter for active disbursed loans
 				const activeLoans = (response.data.data || []).filter((app: Application) => app.status === "Disbursed");
 				setLoans(activeLoans);
-			} catch (error: any) {
+			} catch (err) {
+				const error = err as {response?: {data?: {message?: string}}};
 				toast.error(error.response?.data?.message || "Failed to fetch active loans");
 			} finally {
 				setLoading(false);
@@ -56,7 +57,8 @@ export default function CollectionDashboard() {
 			await api.patch(`/loans/${id}/status`, {status: "Closed"});
 			toast.success("Loan settled and closed successfully.");
 			setLoans((prev) => prev.filter((loan) => loan._id !== id));
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string}}};
 			toast.error(error.response?.data?.message || "Failed to settle loan");
 		}
 	};

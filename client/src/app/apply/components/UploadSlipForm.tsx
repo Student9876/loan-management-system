@@ -35,7 +35,8 @@ export default function UploadSlipForm({onNext, onPrev}: {onNext: () => void; on
 			setSalarySlipUrl(response.data.url);
 			toast.success("File uploaded successfully");
 			onNext();
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string}}};
 			toast.error(error.response?.data?.message || "Upload failed");
 		} finally {
 			setLoading(false);

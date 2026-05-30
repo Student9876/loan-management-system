@@ -41,7 +41,8 @@ export default function SanctionDashboard() {
 				const response = await api.get("/loans/dashboard");
 				const actionableLoans = (response.data.data || []).filter((app: Application) => app.status === "Applied");
 				setApplications(actionableLoans);
-			} catch (error: any) {
+			} catch (err) {
+				const error = err as {response?: {data?: {message?: string}}};
 				toast.error(error.response?.data?.message || "Failed to fetch applications");
 			} finally {
 				setLoading(false);
@@ -57,7 +58,8 @@ export default function SanctionDashboard() {
 			toast.success(`Loan application ${newStatus.toLowerCase()} successfully`);
 			// Remove the processed application from the local state
 			setApplications((prev) => prev.filter((app) => app._id !== id));
-		} catch (error: any) {
+		} catch (err) {
+			const error = err as {response?: {data?: {message?: string}}};
 			toast.error(error.response?.data?.message || "Failed to update status");
 		}
 	};

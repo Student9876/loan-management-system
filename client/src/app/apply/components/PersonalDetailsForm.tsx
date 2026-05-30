@@ -54,7 +54,14 @@ export default function PersonalDetailsForm({onNext}: {onNext: () => void}) {
 						</div>
 						<div className="space-y-2">
 							<Label>Employment Mode</Label>
-							<Select required value={personalDetails.employmentMode} onValueChange={(val: any) => setPersonalDetails({employmentMode: val})}>
+							<Select
+								required
+								value={personalDetails.employmentMode}
+								onValueChange={(val: string | null) => {
+									if (val) {
+										setPersonalDetails({employmentMode: val as "Salaried" | "Self-Employed" | "Unemployed"});
+									}
+								}}>
 								<SelectTrigger>
 									<SelectValue placeholder="Select" />
 								</SelectTrigger>
