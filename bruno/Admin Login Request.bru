@@ -1,0 +1,29 @@
+meta {
+  name: Admin Login Request
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:5000/api/auth/login
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "email": "admin@lms.com",
+    "password": "Test@1234"
+  }
+}
+
+tests {
+  if (res.status === 200) {
+    bru.setEnvVar("jwt_token", res.body.token);
+  }
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}
