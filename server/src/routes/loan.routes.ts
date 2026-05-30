@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { uploadSalarySlip, applyForLoan, getDashboardLoans, updateLoanStatus } from '../controllers/loan.controller';
+import { uploadSalarySlip, applyForLoan, getDashboardLoans, updateLoanStatus, recordPayment } from '../controllers/loan.controller';
 import { verifyToken } from '../middlewares/auth.middleware';
 import { requireRole } from '../middlewares/rbac.middleware';
 import { upload } from '../middlewares/upload.middleware';
@@ -14,4 +14,7 @@ router.post('/apply', verifyToken, requireRole(['Borrower']), applyForLoan);
 router.get('/dashboard', verifyToken, requireRole(['Sales', 'Sanction', 'Disbursement', 'Collection', 'Admin']), getDashboardLoans);
 router.patch('/:id/status', verifyToken, requireRole(['Sanction', 'Disbursement', 'Admin']), updateLoanStatus);
 
+
+// Collection Endpoint
+router.post('/:id/payments', verifyToken, requireRole(['Collection', 'Admin']), recordPayment);
 export default router;

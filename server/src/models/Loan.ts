@@ -1,5 +1,17 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+interface IPayment {
+    utr: string;
+    amount: number;
+    date: Date;
+}
+
+const PaymentSchema = new mongoose.Schema({
+    utr: { type: String, required: true },
+    amount: { type: Number, required: true },
+    date: { type: Date, default: Date.now }
+});
+
 export interface ILoan extends Document {
     borrowerId: mongoose.Types.ObjectId;
     pan: string;
@@ -14,6 +26,7 @@ export interface ILoan extends Document {
     rejectionReason?: string;
     totalRepayment: number;
     outstandingBalance: number;
+    payments: IPayment[]; // <-- Added this so TypeScript knows about it
 }
 
 const LoanSchema: Schema = new Schema({
@@ -26,7 +39,7 @@ const LoanSchema: Schema = new Schema({
         enum: ['Salaried', 'Self-Employed', 'Unemployed'],
         required: true
     },
-    salarySlipUrl: { type: String }, // Populated later in the flow
+    salarySlipUrl: { type: String },
     amount: { type: Number },
     tenure: { type: Number },
     interestRate: { type: Number, default: 12 },
@@ -35,6 +48,7 @@ const LoanSchema: Schema = new Schema({
         enum: ['Lead', 'Applied', 'Sanctioned', 'Rejected', 'Disbursed', 'Closed'],
         default: 'Lead'
     },
+    payments: { type: [PaymentSchema], default: [] },
     rejectionReason: { type: String },
     totalRepayment: { type: Number },
     outstandingBalance: { type: Number }

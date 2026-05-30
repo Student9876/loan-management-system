@@ -144,3 +144,68 @@ export const updateLoanStatus = async (req: Request, res: Response): Promise<voi
         res.status(500).json({ message: 'Error updating loan status', error: error.message });
     }
 };
+
+
+export const recordPayment = async (req: Request, res: Response): Promise<void> => {
+    try {
+        const { id } = req.params;
+        const { utr, amount } = req.body;
+        const role = (req as any).user.role;
+
+        if (role !== 'Collection' && role !== 'Admin') {
+            res.status(403).json({ message: 'Unauthorized access to collections' });
+            return;
+        }
+
+        if (!utr || !amount || amount <= 0) {
+            res.status(400).json({ message: 'Valid UTR and a positive amount are required' });
+            return;
+        }
+
+        // 1. Enforce global UTR uniqueness
+        const existingUtr = await Loan.findOne({ 'payments.utr': utr });
+        if (existingUtr) {
+            res.status(400).json({ message: 'Duplicate UTR: This payment has already been recorded in the system.' });
+            return;
+        }
+
+        // 2. Fetch active loan
+        const loan = await Loan.findById(id);
+        if (!loan) {
+            res.status(404).json({ message: 'Loan not found' });
+            return;
+        }
+
+        if (loan.status !== 'Disbursed') {
+            res.status(400).json({ message: `Cannot record payment on a loan in ${loan.status} state.` });
+            return;
+        }
+
+        // 3. Mathematical validation
+        if (amount > loan.outstandingBalance) {
+            res.status(400).json({
+                message: `Payment of ₹${amount} exceeds the outstanding balance of ₹${loan.outstandingBalance}.`
+            });
+            return;
+        }
+
+        // 4. Ledger entry and balance update
+        loan.payments.push({ utr, amount, date: new Date() });
+        loan.outstandingBalance -= amount;
+
+        // 5. Auto-close mechanism
+        if (loan.outstandingBalance === 0) {
+            loan.status = 'Closed';
+        }
+
+        await loan.save();
+
+        res.status(200).json({
+            message: loan.status === 'Closed' ? 'Final payment processed. Loan Closed.' : 'Partial payment recorded successfully.',
+            loan
+        });
+    } catch (err) {
+        const error = err as Error;
+        res.status(500).json({ message: 'Error recording payment', error: error.message });
+    }
+};
