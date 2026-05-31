@@ -2,6 +2,7 @@
 
 import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
+import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import api from "@/lib/api";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
@@ -25,75 +26,64 @@ interface Application {
 
 export default function CollectionDashboard() {
 	const router = useRouter();
-	const [loans, setLoans] = useState<Application[]>([]);
-	const [loading, setLoading] = useState(true);
+	const queryClient = useQueryClient();
 
 	// Payment Modal State
 	const [activePaymentLoan, setActivePaymentLoan] = useState<Application | null>(null);
 	const [utr, setUtr] = useState("");
 	const [amount, setAmount] = useState<number | "">("");
-	const [processing, setProcessing] = useState(false);
 
+	// RBAC Protection
 	useEffect(() => {
 		const role = localStorage.getItem("role");
 		if (role !== "Collection" && role !== "Admin") {
 			router.push("/sales");
-			return;
 		}
-
-		const fetchLoans = async () => {
-			try {
-				const response = await api.get("/loans/dashboard");
-				const activeLoans = (response.data.data || []).filter((app: Application) => app.status === "Disbursed");
-				setLoans(activeLoans);
-			} catch (err) {
-				const error = err as {response?: {data?: {message?: string}}};
-				toast.error(error.response?.data?.message || "Failed to fetch active loans");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchLoans();
 	}, [router]);
 
-	const handlePaymentSubmit = async (e: React.FormEvent) => {
-		e.preventDefault();
-		if (!activePaymentLoan || !utr || !amount) return;
+	// 1. Declarative Fetching via TanStack Query
+	const {data: loans = [], isLoading} = useQuery({
+		queryKey: ["collection-loans"],
+		queryFn: async () => {
+			const response = await api.get("/loans/dashboard");
+			return (response.data.data || []).filter((app: Application) => app.status === "Disbursed");
+		},
+	});
 
-		setProcessing(true);
-		try {
-			const response = await api.post(`/loans/${activePaymentLoan._id}/payments`, {
-				utr,
-				amount: Number(amount),
+	// 2. Declarative Mutation for Payments
+	const paymentMutation = useMutation({
+		mutationFn: async (paymentData: {id: string; utr: string; amount: number}) => {
+			const response = await api.post(`/loans/${paymentData.id}/payments`, {
+				utr: paymentData.utr,
+				amount: paymentData.amount,
 			});
+			return response.data;
+		},
+		onSuccess: (data) => {
+			toast.success(data.message || "Payment recorded successfully");
 
-			toast.success(response.data.message || "Payment recorded successfully");
+			// Invalidate the cache to trigger an automatic background refetch
+			queryClient.invalidateQueries({queryKey: ["collection-loans"]});
 
-			// Update local state: remove if closed, update balance if partial
-			setLoans(
-				(prev) =>
-					prev
-						.map((loan) => {
-							if (loan._id === activePaymentLoan._id) {
-								const newBalance = loan.outstandingBalance - Number(amount);
-								return {...loan, outstandingBalance: newBalance, status: newBalance <= 0 ? "Closed" : loan.status};
-							}
-							return loan;
-						})
-						.filter((loan) => loan.status !== "Closed"), // Remove it from dashboard if fully paid
-			);
-
-			// Reset and close modal
+			// Reset modal state
 			setActivePaymentLoan(null);
 			setUtr("");
 			setAmount("");
-		} catch (err) {
-			const error = err as {response?: {data?: {message?: string}}};
-			toast.error(error.response?.data?.message || "Failed to process payment");
-		} finally {
-			setProcessing(false);
-		}
+		},
+		onError: (err: {response?: {data?: {message?: string}}}) => {
+			toast.error(err.response?.data?.message || "Failed to process payment");
+		},
+	});
+
+	const handlePaymentSubmit = (e: React.FormEvent) => {
+		e.preventDefault();
+		if (!activePaymentLoan || !utr || !amount) return;
+
+		paymentMutation.mutate({
+			id: activePaymentLoan._id,
+			utr,
+			amount: Number(amount),
+		});
 	};
 
 	return (
@@ -104,7 +94,7 @@ export default function CollectionDashboard() {
 					<CardDescription>Monitor active disbursed loans and register EMI or final settlements.</CardDescription>
 				</CardHeader>
 				<CardContent className="pt-6 bg-slate-50/50">
-					{loading ? (
+					{isLoading ? (
 						<div className="flex justify-center py-8">
 							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
 						</div>
@@ -125,7 +115,7 @@ export default function CollectionDashboard() {
 									</TableRow>
 								</TableHeader>
 								<TableBody>
-									{loans.map((loan) => (
+									{loans.map((loan: Application) => (
 										<TableRow key={loan._id} className="hover:bg-slate-50/80 transition-colors">
 											<TableCell>
 												<div className="font-medium text-slate-900">{loan.borrowerId?.name || "Unknown"}</div>
@@ -221,8 +211,11 @@ export default function CollectionDashboard() {
 								<Button type="button" variant="outline" className="w-1/2 py-5" onClick={() => setActivePaymentLoan(null)}>
 									Cancel
 								</Button>
-								<Button type="submit" className="w-1/2 py-5 bg-purple-600 hover:bg-purple-700 text-white shadow-md" disabled={processing}>
-									{processing ? "Processing..." : "Confirm"}
+								<Button
+									type="submit"
+									className="w-1/2 py-5 bg-purple-600 hover:bg-purple-700 text-white shadow-md"
+									disabled={paymentMutation.isPending}>
+									{paymentMutation.isPending ? "Processing..." : "Confirm"}
 								</Button>
 							</div>
 						</form>

@@ -1,6 +1,8 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect} from "react";
+import {useRouter} from "next/navigation";
+import {useQuery} from "@tanstack/react-query";
 import api from "@/lib/api";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
@@ -8,7 +10,6 @@ import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {toast} from "sonner";
 
-// 1. Updated interface to match the backend's nested borrowerId structure
 interface Lead {
 	_id: string;
 	borrowerId: {
@@ -20,28 +21,24 @@ interface Lead {
 }
 
 export default function SalesDashboard() {
-	const [leads, setLeads] = useState<Lead[]>([]);
-	const [loading, setLoading] = useState(true);
+	const router = useRouter();
 
+	// RBAC Protection
 	useEffect(() => {
-		const fetchLeads = async () => {
-			try {
-				const response = await api.get("/loans/dashboard");
+		const role = localStorage.getItem("role");
+		if (role !== "Sales" && role !== "Admin") {
+			router.push("/login");
+		}
+	}, [router]);
 
-				// 2. Safely extract data and filter ONLY for 'Lead' status
-				// This ensures the Admin doesn't see actual loans on the Sales tab
-				const activeLeads = (response.data.data || []).filter((item: Lead) => item.status === "Lead");
-
-				setLeads(activeLeads);
-			} catch (err) {
-				const error = err as {response?: {data?: {message?: string}}};
-				toast.error(error.response?.data?.message || "Failed to fetch leads");
-			} finally {
-				setLoading(false);
-			}
-		};
-		fetchLeads();
-	}, []);
+	// Declarative Fetching
+	const {data: leads = [], isLoading} = useQuery({
+		queryKey: ["sales-leads"],
+		queryFn: async () => {
+			const response = await api.get("/loans/dashboard");
+			return (response.data.data || []).filter((item: Lead) => item.status === "Lead");
+		},
+	});
 
 	return (
 		<Card className="shadow-sm border-slate-200">
@@ -50,7 +47,7 @@ export default function SalesDashboard() {
 				<CardDescription>Registered borrowers who have not yet submitted a loan application.</CardDescription>
 			</CardHeader>
 			<CardContent className="pt-6 bg-slate-50/50">
-				{loading ? (
+				{isLoading ? (
 					<div className="flex justify-center py-8">
 						<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
 					</div>
@@ -70,9 +67,8 @@ export default function SalesDashboard() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{leads.map((lead) => (
+								{leads.map((lead: Lead) => (
 									<TableRow key={lead._id} className="hover:bg-slate-50/80 transition-colors">
-										{/* 3. Updated mapping to access the nested data safely */}
 										<TableCell className="font-medium text-slate-900">{lead.borrowerId?.name}</TableCell>
 										<TableCell className="text-slate-600">{lead.borrowerId?.email}</TableCell>
 										<TableCell>

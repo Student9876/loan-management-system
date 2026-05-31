@@ -1,7 +1,8 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useEffect} from "react";
 import {useRouter} from "next/navigation";
+import {useQuery, useMutation, useQueryClient} from "@tanstack/react-query";
 import api from "@/lib/api";
 import {Card, CardContent, CardDescription, CardHeader, CardTitle} from "@/components/ui/card";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
@@ -24,43 +25,38 @@ interface Application {
 
 export default function DisbursementDashboard() {
 	const router = useRouter();
-	const [applications, setApplications] = useState<Application[]>([]);
-	const [loading, setLoading] = useState(true);
+	const queryClient = useQueryClient();
 
 	useEffect(() => {
 		const role = localStorage.getItem("role");
 		if (role !== "Disbursement" && role !== "Admin") {
 			router.push("/sales");
-			return;
 		}
-
-		const fetchApplications = async () => {
-			try {
-				const response = await api.get("/loans/dashboard");
-				// Force filter on the frontend to ensure we only see actionable items for this stage
-				const actionableLoans = (response.data.data || []).filter((app: Application) => app.status === "Sanctioned");
-				setApplications(actionableLoans);
-			} catch (err) {
-				const error = err as {response?: {data?: {message?: string}}};
-				toast.error(error.response?.data?.message || "Failed to fetch applications");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchApplications();
 	}, [router]);
 
-	const handleDisbursement = async (id: string) => {
-		try {
-			await api.patch(`/loans/${id}/status`, {status: "Disbursed"});
+	// Declarative Fetching
+	const {data: applications = [], isLoading} = useQuery({
+		queryKey: ["disbursement-loans"],
+		queryFn: async () => {
+			const response = await api.get("/loans/dashboard");
+			return (response.data.data || []).filter((app: Application) => app.status === "Sanctioned");
+		},
+	});
+
+	// Declarative Mutation
+	const disburseMutation = useMutation({
+		mutationFn: async (id: string) => {
+			const response = await api.patch(`/loans/${id}/status`, {status: "Disbursed"});
+			return response.data;
+		},
+		onSuccess: () => {
 			toast.success("Funds disbursed successfully. Loan is now active.");
-			setApplications((prev) => prev.filter((app) => app._id !== id));
-		} catch (err) {
-			const error = err as {response?: {data?: {message?: string}}};
-			toast.error(error.response?.data?.message || "Failed to disburse funds");
-		}
-	};
+			queryClient.invalidateQueries({queryKey: ["disbursement-loans"]});
+		},
+		onError: (err: {response?: {data?: {message?: string}}}) => {
+			toast.error(err.response?.data?.message || "Failed to disburse funds");
+		},
+	});
 
 	return (
 		<Card className="shadow-sm border-slate-200">
@@ -69,7 +65,7 @@ export default function DisbursementDashboard() {
 				<CardDescription>Review sanctioned loans and execute final fund transfers to borrowers.</CardDescription>
 			</CardHeader>
 			<CardContent className="pt-6 bg-slate-50/50">
-				{loading ? (
+				{isLoading ? (
 					<div className="flex justify-center py-8">
 						<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
 					</div>
@@ -90,7 +86,7 @@ export default function DisbursementDashboard() {
 								</TableRow>
 							</TableHeader>
 							<TableBody>
-								{applications.map((app) => (
+								{applications.map((app: Application) => (
 									<TableRow key={app._id} className="hover:bg-slate-50/80 transition-colors">
 										<TableCell>
 											<div className="font-medium text-slate-900">{app.borrowerId?.name || "Unknown"}</div>
@@ -113,9 +109,10 @@ export default function DisbursementDashboard() {
 											<Button
 												size="sm"
 												className="bg-slate-900 hover:bg-slate-800 text-white"
-												onClick={() => handleDisbursement(app._id)}>
+												disabled={disburseMutation.isPending}
+												onClick={() => disburseMutation.mutate(app._id)}>
 												<Banknote className="w-4 h-4 mr-2" />
-												Disburse Funds
+												{disburseMutation.isPending && disburseMutation.variables === app._id ? "Processing..." : "Disburse Funds"}
 											</Button>
 										</TableCell>
 									</TableRow>

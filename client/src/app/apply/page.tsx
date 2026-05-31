@@ -1,6 +1,7 @@
 "use client";
 
-import {useEffect, useState} from "react";
+import {useState} from "react";
+import {useQuery} from "@tanstack/react-query";
 import api from "@/lib/api";
 import PersonalDetailsForm from "./components/PersonalDetailsForm";
 import UploadSlipForm from "./components/UploadSlipForm";
@@ -9,7 +10,6 @@ import {Card, CardContent} from "@/components/ui/card";
 import {Clock, CheckCircle, XCircle, FileText, Plus} from "lucide-react";
 import {Button} from "@/components/ui/button";
 
-// Replaces the 'any' type to satisfy ESLint
 interface LoanApplication {
 	_id: string;
 	status: string;
@@ -22,32 +22,21 @@ interface LoanApplication {
 
 export default function ApplyPage() {
 	const [step, setStep] = useState(1);
-	const [loans, setLoans] = useState<LoanApplication[]>([]);
-	const [loading, setLoading] = useState(true);
 	const [activeTab, setActiveTab] = useState<"dashboard" | "apply">("dashboard");
 
 	const nextStep = () => setStep((prev) => prev + 1);
 	const prevStep = () => setStep((prev) => prev - 1);
 
-	useEffect(() => {
-		const fetchMyLoans = async () => {
-			try {
-				const response = await api.get("/loans/dashboard");
-				if (response.data.data) {
-					setLoans(response.data.data);
-				}
-			} catch (error) {
-				// Utilized the error variable to satisfy ESLint
-				console.error("Failed to fetch application status:", error);
-			} finally {
-				setLoading(false);
-			}
-		};
+	// Declarative Fetching via TanStack Query
+	const {data: loans = [], isLoading} = useQuery({
+		queryKey: ["borrower-loans"],
+		queryFn: async () => {
+			const response = await api.get("/loans/dashboard");
+			return response.data.data || [];
+		},
+	});
 
-		fetchMyLoans();
-	}, [activeTab]);
-
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className="flex justify-center items-center h-[60vh]">
 				<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
@@ -94,7 +83,6 @@ export default function ApplyPage() {
 						<div className="text-center py-16 bg-white rounded-xl border border-dashed border-slate-300">
 							<FileText className="w-12 h-12 text-slate-300 mx-auto mb-4" />
 							<h3 className="text-lg font-semibold text-slate-900 mb-1">No Applications Found</h3>
-							{/* Escaped the apostrophe here */}
 							<p className="text-slate-500 mb-6">You haven&apos;t applied for any loans yet.</p>
 							<Button onClick={() => setActiveTab("apply")} className="bg-purple-600 hover:bg-purple-700">
 								Start First Application
@@ -102,7 +90,7 @@ export default function ApplyPage() {
 						</div>
 					) : (
 						<div className="grid grid-cols-1 gap-6">
-							{loans.map((loan, index) => (
+							{loans.map((loan: LoanApplication, index: number) => (
 								<Card key={loan._id || index} className="shadow-sm border-slate-200 overflow-hidden">
 									<div
 										className={`h-1.5 w-full ${
@@ -191,7 +179,6 @@ export default function ApplyPage() {
 									</span>
 								</div>
 							))}
-							{/* Fixed -z-0 to z-0 here */}
 							<div className="absolute top-5 left-0 w-full h-1 bg-slate-200 z-0"></div>
 							<div
 								className="absolute top-5 left-0 h-1 bg-purple-600 z-0 transition-all duration-300"

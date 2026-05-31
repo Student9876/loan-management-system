@@ -1,7 +1,6 @@
 "use client";
 
-import {useState} from "react";
-import {useRouter} from "next/navigation";
+import {useMutation, useQueryClient} from "@tanstack/react-query";
 import {useApplicationStore} from "@/store/useApplicationStore";
 import api from "@/lib/api";
 import {Card, CardContent, CardHeader, CardTitle} from "@/components/ui/card";
@@ -11,40 +10,45 @@ import {Slider} from "@/components/ui/slider";
 import {toast} from "sonner";
 
 export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
-	const router = useRouter();
+	const queryClient = useQueryClient();
 	const {personalDetails, salarySlipUrl, loanConfig, setLoanConfig, resetApplication} = useApplicationStore();
-	const [loading, setLoading] = useState(false);
 
-	// Math: SI = (P * R * T) / (365 * 100)
 	const interest = (loanConfig.amount * loanConfig.interestRate * loanConfig.tenure) / (365 * 100);
 	const totalRepayment = loanConfig.amount + interest;
 
-	const handleApply = async () => {
-		setLoading(true);
-		try {
-			const payload = {
-				...personalDetails,
-				salarySlipUrl,
-				amount: loanConfig.amount,
-				tenure: loanConfig.tenure,
-			};
-
-			await api.post("/loans/apply", payload);
+	const applyMutation = useMutation({
+		// 1. Replaced 'any' with a generic Record type for the payload
+		mutationFn: async (payload: Record<string, unknown>) => {
+			const response = await api.post("/loans/apply", payload);
+			return response.data;
+		},
+		onSuccess: () => {
 			toast.success("Loan application submitted successfully!");
+			queryClient.invalidateQueries({queryKey: ["borrower-loans"]});
 			resetApplication();
-			router.push("/login"); // Or a dedicated success page
-		} catch (err) {
-			const error = err as {response?: {data?: {message?: string; errors?: string[]}}};
-			const msg = error.response?.data?.message || "Submission failed";
-			const errors = error.response?.data?.errors;
+			window.location.href = "/apply";
+		},
+		// 2. Replaced 'any' with explicit error structure
+		onError: (err: {response?: {data?: {message?: string; errors?: string[]}}}) => {
+			const msg = err.response?.data?.message || "Submission failed";
+			const errors = err.response?.data?.errors;
+
 			if (errors && errors.length > 0) {
 				errors.forEach((e: string) => toast.error(`BRE Reject: ${e}`));
 			} else {
 				toast.error(msg);
 			}
-		} finally {
-			setLoading(false);
-		}
+		},
+	});
+
+	const handleApply = () => {
+		const payload = {
+			...personalDetails,
+			salarySlipUrl,
+			amount: loanConfig.amount,
+			tenure: loanConfig.tenure,
+		};
+		applyMutation.mutate(payload);
 	};
 
 	return (
@@ -63,9 +67,7 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 						max={500000}
 						step={10000}
 						value={[loanConfig.amount]}
-						onValueChange={(val: number | readonly number[]) =>
-							setLoanConfig({amount: Array.isArray(val) ? val[0] : val})
-						}
+						onValueChange={(val: number | readonly number[]) => setLoanConfig({amount: Array.isArray(val) ? val[0] : val})}
 					/>
 				</div>
 
@@ -79,9 +81,7 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 						max={365}
 						step={1}
 						value={[loanConfig.tenure]}
-						onValueChange={(val: number | readonly number[]) =>
-							setLoanConfig({tenure: Array.isArray(val) ? val[0] : val})
-						}
+						onValueChange={(val: number | readonly number[]) => setLoanConfig({tenure: Array.isArray(val) ? val[0] : val})}
 					/>
 				</div>
 
@@ -101,11 +101,11 @@ export default function LoanConfigForm({onPrev}: {onPrev: () => void}) {
 				</div>
 
 				<div className="flex space-x-4 pt-4">
-					<Button variant="outline" className="w-1/3" onClick={onPrev} disabled={loading}>
+					<Button variant="outline" className="w-1/3" onClick={onPrev} disabled={applyMutation.isPending}>
 						Back
 					</Button>
-					<Button className="w-2/3" onClick={handleApply} disabled={loading}>
-						{loading ? "Applying..." : "Submit Application"}
+					<Button className="w-2/3" onClick={handleApply} disabled={applyMutation.isPending}>
+						{applyMutation.isPending ? "Applying..." : "Submit Application"}
 					</Button>
 				</div>
 			</CardContent>
