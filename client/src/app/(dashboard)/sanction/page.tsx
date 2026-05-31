@@ -28,6 +28,9 @@ export default function SanctionDashboard() {
 	const router = useRouter();
 	const [applications, setApplications] = useState<Application[]>([]);
 	const [loading, setLoading] = useState(true);
+	const [activeRejectLoan, setActiveRejectLoan] = useState<string | null>(null);
+	const [rejectionReason, setRejectionReason] = useState("");
+	const [processing, setProcessing] = useState(false);
 
 	useEffect(() => {
 		const role = localStorage.getItem("role");
@@ -52,15 +55,22 @@ export default function SanctionDashboard() {
 		fetchApplications();
 	}, [router]);
 
-	const handleStatusUpdate = async (id: string, newStatus: string) => {
+	const handleStatusUpdate = async (id: string, newStatus: string, reason?: string) => {
 		try {
-			await api.patch(`/loans/${id}/status`, {status: newStatus});
-			toast.success(`Loan application ${newStatus.toLowerCase()} successfully`);
-			// Remove the processed application from the local state
+			setProcessing(true);
+			await api.patch(`/loans/${id}/status`, {
+				status: newStatus,
+				...(reason && {rejectionReason: reason}),
+			});
+			toast.success(`Application ${newStatus.toLowerCase()} successfully`);
 			setApplications((prev) => prev.filter((app) => app._id !== id));
+			setActiveRejectLoan(null);
+			setRejectionReason("");
 		} catch (err) {
 			const error = err as {response?: {data?: {message?: string}}};
-			toast.error(error.response?.data?.message || "Failed to update status");
+			toast.error(error.response?.data?.message || `Failed to update status`);
+		} finally {
+			setProcessing(false);
 		}
 	};
 
@@ -129,7 +139,7 @@ export default function SanctionDashboard() {
 													variant="outline"
 													size="sm"
 													className="text-red-600 hover:bg-red-50 hover:text-red-700 border-red-200"
-													onClick={() => handleStatusUpdate(app._id, "Rejected")}>
+													onClick={() => setActiveRejectLoan(app._id)}>
 													<XCircle className="w-4 h-4 mr-1" />
 													Reject
 												</Button>
@@ -146,6 +156,46 @@ export default function SanctionDashboard() {
 								))}
 							</TableBody>
 						</Table>
+					</div>
+				)}
+				{/* Tailwind Rejection Modal */}
+				{activeRejectLoan && (
+					<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+						<div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col overflow-hidden">
+							<div className="px-6 py-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+								<h3 className="font-semibold text-lg text-slate-900">Reject Application</h3>
+								<button onClick={() => setActiveRejectLoan(null)} className="text-slate-400 hover:text-slate-700">
+									✕
+								</button>
+							</div>
+							<div className="p-6 space-y-4">
+								<div className="space-y-2">
+									<label className="text-sm font-semibold text-slate-700">
+										Reason for Rejection <span className="text-red-500">*</span>
+									</label>
+									<textarea
+										required
+										rows={3}
+										placeholder="e.g., CIBIL score too low, inconsistent signature, etc."
+										className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-red-500"
+										value={rejectionReason}
+										onChange={(e) => setRejectionReason(e.target.value)}
+									/>
+								</div>
+								<div className="pt-4 flex space-x-3">
+									<Button type="button" variant="outline" className="w-1/2" onClick={() => setActiveRejectLoan(null)}>
+										Cancel
+									</Button>
+									<Button
+										type="button"
+										className="w-1/2 bg-red-600 hover:bg-red-700 text-white"
+										disabled={!rejectionReason.trim() || processing}
+										onClick={() => handleStatusUpdate(activeRejectLoan, "Rejected", rejectionReason)}>
+										{processing ? "Processing..." : "Confirm Rejection"}
+									</Button>
+								</div>
+							</div>
+						</div>
 					</div>
 				)}
 			</CardContent>

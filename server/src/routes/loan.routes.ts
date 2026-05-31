@@ -7,11 +7,11 @@ import { upload } from '../middlewares/upload.middleware';
 const router = Router();
 
 // Borrower Application Endpoints
-router.post('/upload-slip', verifyToken, requireRole(['Borrower']), upload.single('file'), uploadSalarySlip);
+router.post('/upload-slip', verifyToken, requireRole(['Borrower']), uploadSalarySlip);
 router.post('/apply', verifyToken, requireRole(['Borrower']), applyForLoan);
 
 // Dashboard Endpoints
-router.get('/dashboard', verifyToken, requireRole(['Sales', 'Sanction', 'Disbursement', 'Collection', 'Admin']), getDashboardLoans);
+router.get('/dashboard', verifyToken, requireRole(['Borrower', 'Sales', 'Sanction', 'Disbursement', 'Collection', 'Admin']), getDashboardLoans);
 router.patch('/:id/status', verifyToken, requireRole(['Sanction', 'Disbursement', 'Admin']), updateLoanStatus);
 
 

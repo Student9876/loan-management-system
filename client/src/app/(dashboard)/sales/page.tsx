@@ -8,10 +8,14 @@ import {Badge} from "@/components/ui/badge";
 import {Button} from "@/components/ui/button";
 import {toast} from "sonner";
 
+// 1. Updated interface to match the backend's nested borrowerId structure
 interface Lead {
 	_id: string;
-	name: string;
-	email: string;
+	borrowerId: {
+		name: string;
+		email: string;
+	};
+	status: string;
 	createdAt: string;
 }
 
@@ -23,9 +27,12 @@ export default function SalesDashboard() {
 		const fetchLeads = async () => {
 			try {
 				const response = await api.get("/loans/dashboard");
-				if (response.data.type === "leads") {
-					setLeads(response.data.data);
-				}
+
+				// 2. Safely extract data and filter ONLY for 'Lead' status
+				// This ensures the Admin doesn't see actual loans on the Sales tab
+				const activeLeads = (response.data.data || []).filter((item: Lead) => item.status === "Lead");
+
+				setLeads(activeLeads);
 			} catch (err) {
 				const error = err as {response?: {data?: {message?: string}}};
 				toast.error(error.response?.data?.message || "Failed to fetch leads");
@@ -65,8 +72,9 @@ export default function SalesDashboard() {
 							<TableBody>
 								{leads.map((lead) => (
 									<TableRow key={lead._id} className="hover:bg-slate-50/80 transition-colors">
-										<TableCell className="font-medium text-slate-900">{lead.name}</TableCell>
-										<TableCell className="text-slate-600">{lead.email}</TableCell>
+										{/* 3. Updated mapping to access the nested data safely */}
+										<TableCell className="font-medium text-slate-900">{lead.borrowerId?.name}</TableCell>
+										<TableCell className="text-slate-600">{lead.borrowerId?.email}</TableCell>
 										<TableCell>
 											<Badge variant="secondary" className="bg-blue-100 text-blue-800 hover:bg-blue-200 border-none">
 												Cold Lead
@@ -77,7 +85,7 @@ export default function SalesDashboard() {
 												variant="ghost"
 												size="sm"
 												className="hover:text-blue-700"
-												onClick={() => toast.info(`Initiating contact sequence for ${lead.name}...`)}>
+												onClick={() => toast.info(`Initiating contact sequence for ${lead.borrowerId?.name}...`)}>
 												Follow Up
 											</Button>
 										</TableCell>

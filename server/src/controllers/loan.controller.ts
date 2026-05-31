@@ -3,23 +3,47 @@ import cloudinary from '../config/cloudinary';
 import Loan from '../models/Loan';
 import User from '../models/User';
 import { executeBre } from '../services/bre.service';
+import multer from 'multer';
+import { upload } from '../middlewares/upload.middleware';
 
-export const uploadSalarySlip = async (req: Request, res: Response): Promise<void> => {
-    try {
-        if (!req.file) {
-            res.status(400).json({ message: 'No file provided or invalid file type.' });
+export const uploadSalarySlip = (req: Request, res: Response): void => {
+    const singleUpload = upload.single('file');
+
+    singleUpload(req, res, async (err: any) => {
+        // 1. Intercept Multer Errors (e.g., 5MB limit)
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                res.status(400).json({ message: 'File is too large. Maximum size is 5MB.' });
+                return;
+            }
+            res.status(400).json({ message: err.message });
+            return;
+        } else if (err) {
+            // Catch custom fileFilter errors (e.g., wrong file type)
+            res.status(400).json({ message: err.message || 'File upload failed' });
             return;
         }
-        const b64 = Buffer.from(req.file.buffer).toString('base64');
-        const dataURI = `data:${req.file.mimetype};base64,${b64}`;
-        const result = await cloudinary.uploader.upload(dataURI, {
-            resource_type: 'auto',
-            folder: 'lms_salary_slips',
-        });
-        res.status(200).json({ url: result.secure_url });
-    } catch (error: any) {
-        res.status(500).json({ message: 'Error uploading to Cloudinary', error: error.message });
-    }
+
+        // 2. Process Cloudinary Upload
+        try {
+            if (!req.file) {
+                res.status(400).json({ message: 'No file provided or invalid file type.' });
+                return;
+            }
+
+            const b64 = Buffer.from(req.file.buffer).toString('base64');
+            const dataURI = `data:${req.file.mimetype};base64,${b64}`;
+
+            const result = await cloudinary.uploader.upload(dataURI, {
+                resource_type: 'auto',
+                folder: 'lms_salary_slips',
+            });
+
+            res.status(200).json({ url: result.secure_url });
+        } catch (error: any) {
+            res.status(500).json({ message: 'Error uploading to Cloudinary', error: error.message });
+        }
+    });
 };
 
 export const applyForLoan = async (req: Request, res: Response): Promise<void> => {
@@ -63,37 +87,62 @@ export const applyForLoan = async (req: Request, res: Response): Promise<void> =
 
 export const getDashboardLoans = async (req: Request, res: Response): Promise<void> => {
     try {
+        const userId = (req as any).user.id;
         const role = (req as any).user.role;
-        let query = {};
 
-        // Filter loans strictly based on the executive's role
-        switch (role) {
-            case 'Sanction':
-                query = { status: 'Applied' };
-                break;
-            case 'Disbursement':
-                query = { status: 'Sanctioned' };
-                break;
-            case 'Collection':
-                query = { status: 'Disbursed' };
-                break;
-            case 'Sales':
-                // Sales tracks leads: Borrowers who have registered but have no loan document
-                const borrowersWithLoans = await Loan.distinct('borrowerId');
-                const leads = await User.find({ role: 'Borrower', _id: { $nin: borrowersWithLoans } }).select('-passwordHash');
-                res.status(200).json({ data: leads, type: 'leads' });
-                return;
-            case 'Admin':
-                query = {}; // Admin sees all
-                break;
-            default:
-                res.status(403).json({ message: 'Role not authorized for dashboard access.' });
-                return;
+        // BORROWER: Return only their specific loans
+        if (role === 'Borrower') {
+            const myLoans = await Loan.find({ borrowerId: userId }).sort({ createdAt: -1 });
+            res.status(200).json({ data: myLoans });
+            return;
         }
 
-        const loans = await Loan.find(query).populate('borrowerId', 'name email');
-        res.status(200).json({ data: loans, type: 'loans' });
-    } catch (error: any) {
+        // HELPER: Compute virtual leads for Sales & Admin
+        const fetchLeads = async () => {
+            const allBorrowers = await User.find({ role: 'Borrower' }).select('name email createdAt');
+            const allLoans = await Loan.find().select('borrowerId');
+            const borrowersWithLoans = new Set(allLoans.map(l => l.borrowerId.toString()));
+
+            return allBorrowers
+                .filter(b => !borrowersWithLoans.has(b._id.toString()))
+                .map(b => ({
+                    _id: b._id.toString(), // Use User ID to prevent frontend key crashes
+                    borrowerId: { name: b.name, email: b.email },
+                    status: 'Lead',
+                    totalRepayment: 0,
+                    outstandingBalance: 0,
+                    tenure: 0,
+                    createdAt: (b as any).createdAt || new Date()
+                }));
+        };
+
+        // SALES: Return ONLY the leads
+        if (role === 'Sales') {
+            const leads = await fetchLeads();
+            res.status(200).json({ data: leads });
+            return;
+        }
+
+        // OTHER ROLES: State machine queries
+        let query = {};
+        if (role === 'Sanction') query = { status: 'Applied' };
+        else if (role === 'Disbursement') query = { status: 'Sanctioned' };
+        else if (role === 'Collection') query = { status: 'Disbursed' };
+
+        const loans = await Loan.find(query)
+            .populate('borrowerId', 'name email')
+            .sort({ createdAt: -1 });
+
+        // ADMIN: Combine both actual loans AND virtual leads
+        if (role === 'Admin') {
+            const leads = await fetchLeads();
+            res.status(200).json({ data: [...leads, ...loans] });
+            return;
+        }
+
+        res.status(200).json({ data: loans });
+    } catch (err) {
+        const error = err as Error;
         res.status(500).json({ message: 'Error fetching dashboard data', error: error.message });
     }
 };
@@ -121,11 +170,6 @@ export const updateLoanStatus = async (req: Request, res: Response): Promise<voi
         }
         else if (loan.status === 'Disbursed' && status === 'Closed') {
             if (role === 'Collection' || role === 'Admin') isValidTransition = true;
-        }
-
-        if (!isValidTransition) {
-            res.status(400).json({ message: `Invalid status transition to ${status} for role ${role}` });
-            return;
         }
 
         if (!isValidTransition) {
