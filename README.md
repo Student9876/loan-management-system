@@ -119,3 +119,4 @@ Use the following pre-created accounts to immediately test the system's Role-Bas
 | Borrower | borrower@lms.com | Borrower application portal only. |
 
 ## Walkthrough Video
+https://drive.google.com/file/d/1elFGsJfforIJYJRbc3ebyTT5UpCoDhAW/view?usp=sharing
