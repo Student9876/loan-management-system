@@ -18,9 +18,14 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/loans', loanRoutes);
 
-app.get('/health', (req, res) => {
-    res.status(200).json({ status: 'OK' });
+app.get('/', (req , res) => {
+    res.status(200).json({
+        status: 'active',
+        message: 'LMS API is running.',
+        timestamp: new Date().toISOString()
+    });
 });
+
 
 mongoose
     .connect(process.env.MONGODB_URI as string)
