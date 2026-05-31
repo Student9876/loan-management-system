@@ -238,7 +238,8 @@ export const recordPayment = async (req: Request, res: Response): Promise<void> 
         loan.outstandingBalance -= amount;
 
         // 5. Auto-close mechanism
-        if (loan.outstandingBalance === 0) {
+        if (loan.outstandingBalance <= 0.01) {
+            loan.outstandingBalance = 0; // Snap to clean zero
             loan.status = 'Closed';
         }
 

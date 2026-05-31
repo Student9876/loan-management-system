@@ -198,7 +198,8 @@ export default function CollectionDashboard() {
 								<input
 									type="number"
 									required
-									min="1"
+									min="0.01"
+									step="any"
 									max={activePaymentLoan.outstandingBalance}
 									placeholder={`Max: ${activePaymentLoan.outstandingBalance}`}
 									className="w-full px-3 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all"
