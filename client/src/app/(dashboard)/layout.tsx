@@ -5,8 +5,11 @@ import {useRouter, usePathname} from "next/navigation";
 import Link from "next/link";
 import {Button} from "@/components/ui/button";
 
+import {useQueryClient} from "@tanstack/react-query";
+
 export default function DashboardLayout({children}: {children: React.ReactNode}) {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const pathname = usePathname();
 	const [userName, setUserName] = useState("");
 	const [role, setRole] = useState("");
@@ -30,6 +33,7 @@ export default function DashboardLayout({children}: {children: React.ReactNode})
 
 	const handleLogout = () => {
 		localStorage.clear();
+		queryClient.clear();
 		router.push("/login");
 	};
 

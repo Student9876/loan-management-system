@@ -26,7 +26,7 @@ export interface ILoan extends Document {
     rejectionReason?: string;
     totalRepayment: number;
     outstandingBalance: number;
-    payments: IPayment[]; // <-- Added this so TypeScript knows about it
+    payments: IPayment[];
 }
 
 const LoanSchema: Schema = new Schema({

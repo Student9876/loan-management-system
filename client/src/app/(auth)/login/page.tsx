@@ -9,8 +9,11 @@ import {Input} from "@/components/ui/input";
 import {Label} from "@/components/ui/label";
 import {Button} from "@/components/ui/button";
 
+import {useQueryClient} from "@tanstack/react-query";
+
 export default function LoginPage() {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
@@ -28,6 +31,9 @@ export default function LoginPage() {
 			localStorage.setItem("token", token);
 			localStorage.setItem("role", user.role);
 			localStorage.setItem("userName", user.name);
+
+			// Clear the cache to prevent stale data from showing on redirect
+			queryClient.clear();
 
 			switch (user.role) {
 				case "Borrower":

@@ -4,8 +4,11 @@ import {useEffect, useState} from "react";
 import {useRouter} from "next/navigation";
 import {Button} from "@/components/ui/button";
 
+import {useQueryClient} from "@tanstack/react-query";
+
 export default function ApplyLayout({children}: {children: React.ReactNode}) {
 	const router = useRouter();
+	const queryClient = useQueryClient();
 	const [userName, setUserName] = useState("");
 
 	useEffect(() => {
@@ -25,6 +28,7 @@ export default function ApplyLayout({children}: {children: React.ReactNode}) {
 
 	const handleLogout = () => {
 		localStorage.clear();
+		queryClient.clear();
 		router.push("/login");
 	};
 

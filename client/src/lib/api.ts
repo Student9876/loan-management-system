@@ -14,7 +14,6 @@ api.interceptors.request.use((config) => {
 });
 
 // 2. Handle unauthorized responses
-// 2. Handle unauthorized responses
 api.interceptors.response.use(
     (response) => response,
     (error) => {
